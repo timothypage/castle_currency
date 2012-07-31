@@ -10,6 +10,7 @@ We may move to a shared repository model in the future.
 ###Local Development
 
 Locally, I use a branch and merge (or rebase) workflow.
+
 1. Create a new local branch with `git checkout -b experimental`.
 2. Commit as usual. You can confirm you're on the experimental branch with `git branch -a`.
 3. If all changes in your branch have been committed, you can switch back to your original branch and merge there with `git checkout master` and `git merge experimental`.
