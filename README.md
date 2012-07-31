@@ -1,4 +1,4 @@
-castle_currency
-===============
+#Castle
+###Currency Application
 
-Reworking of the currency application for Castle
+An update to Castle's currency application.
