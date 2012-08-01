@@ -13,3 +13,15 @@ How to setup the working environment for Django development.
 
 ####Install the dependencies.
     pip install -r DEPENDENCIES
+
+If the virtual environment has been activated and its dependencies installed, you should be able to run the django project's test suite.
+
+	python manage.py test
+
+To run the server, the database must be sync'd.
+
+    python manage.py syncdb
+
+And then the server can be run (defaults to localhost:8000).
+
+    python manage.py runserver

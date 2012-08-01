@@ -76,19 +76,21 @@ A asynchronous process is needed for the scraping the daily IMF tsv of exchange 
 
 The formatting options are a mess, but until a "holistic" (holy fuck, shoot me in the face) solution can be found for downstream formatting, knowing what to store in the currency model is simply a guess.
 
-In short, a monetary data in US Dollars might look like $1,234.56 (in millions), while a Euro data point would need to alter not only the symbol, but the position of the symbol (before or after the amount), as well as the characters used for the decimal (e.g. ".") and group delimitation (e.g. ","). Worse, some currencies have large exchange rates that could change the magnitude (needing representation in billions instead of millions), or even the number of digits in each group (the INR prefers a million to be formatted as 10,00,000).
+In short, a monetary datum in US Dollars might look like $1,234.56 (in millions), while another currency may need to alter not only the symbol, but the position of the symbol (before or after the digits), as well as the characters used for the decimal (e.g. ".") and group delimitation (e.g. ","). Worse, some currencies have large exchange rates that could change the magnitude (needing representation in billions instead of millions), or even the number of digits in each group (the INR prefers a million to be formatted as 10,00,000).
 
-But these problems are mainly in the table generation code, the currency application is mainly a store of data.
+Also, the usage of floating points for storing exchange rates causes problems when comparing the stored values against those loaded from the IMF data. Using decimal fields (were the decimal point is fixed) would correct this issue, but introduces a potentially unknown cast from decimals to floating points (as monetary data metrics are also stored in floating point).
 
-The usage of floating points for storing exchange rates has given rise to issues when comparing the stored values against those loaded from the IMF data. Using decimal fields (were the decimal point is fixed) would fix this comparison issue, but introduces a potentially unknown cast from decimals to floating points (as monetary data metrics are also stored in floating point).
+But these problems are mainly in the table generation code, and can be ignored for now in the currency application.
 
-The goal is to make the application as autonomous as possible.
+The main goal is to make the application as autonomous as possible.
 
 ###Interactions with other applications
 
 The Currency application should interface with the various custom model fields for representing quarters (currently not included in this repo).
 
 It should also make use of a generic update function. This function will need an understanding of how to compare floating points.
+
+As stated previosuly, the format information attached to the currency model is used downstream in the table generation code.
 
 ###Future Endeavors
 
