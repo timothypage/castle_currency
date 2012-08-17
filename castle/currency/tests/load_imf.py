@@ -39,5 +39,12 @@ class ParseTest(TestCase):
 
     def test_parse_tsv(self):
         filename = 'currency/tests/testfiles/historical.tsv'
+        Currency.objects.create(name="Australian dollar", abbrev="AUD")
+        Currency.objects.create(name="Canadian dollar", abbrev="CAD")
+        Currency.objects.create(name="Chinese yuan", abbrev="CNY")
+        Currency.objects.create(name="Euro", abbrev="EUR")
+        Currency.objects.create(name="Indian rupee", abbrev="INR")
+        Currency.objects.create(name="Japanese yen", abbrev="JPY")
+        Currency.objects.create(name="Korean won", abbrev="KRW")
         parse_tsv(filename)
 
