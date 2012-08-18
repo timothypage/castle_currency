@@ -5,7 +5,6 @@ import datetime
 from difflib import SequenceMatcher
 import re
 from os.path import isfile
-from string import strip
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -53,6 +52,7 @@ def ask_boolean(message):
         print(" > please answer 'yes' or 'no'")
         return ask_boolean(message)
 
+
 def parse_date(date_string):
     """ each line will start with date to be parsed to python datetime object,
         return None if parsing fails"""
@@ -62,18 +62,20 @@ def parse_date(date_string):
         pass
     return None
 
+
 def parse_exchange_rate(exchange_string):
     try:
-        return float(exchange_string)
+        return float(exchange_string.replace("\xa0", ""))
     except ValueError:
         pass
     return None
+
 
 def parse_currency(currency_string):
     p = re.compile('\([A-Z]{3}\)') # exactly three upper case letters inside parentheses
     try:
         abbrev_string = p.search(currency_string).group()
-        abbrev_string = strip(abbrev_string, '()')
+        abbrev_string = abbrev_string.strip('()')
     except AttributeError:
         return None
 
@@ -84,19 +86,83 @@ def parse_currency(currency_string):
     return None
 
 
+#def parse_tsv(filename):
+#    dates_and_rates = []
+#    currencies_in_file = []
+#    with open(filename, 'r') as f:
+#        imf = csv.reader(f, delimiter='\t')
+#        found_pivot = False
+#        have_currencies = False
+#        for row_number, row in enumerate(imf):
+#            for col_number, cell in enumerate(row):
+##                print(cell)
+#                if not found_pivot:
+#                    if cell[:20] == "Representative rates":
+#                        pivot = (row_number, col_number)
+#                        print("found it at ", pivot)
+#                        print(pivot[1])
+#                        found_pivot = True
+#                if found_pivot:
+#                    if col_number < pivot[1]:
+#                        continue
+#
+#                    if cell == "Date":
+#                        continue
+#                    
+#                    currency = parse_currency(cell)
+#                    if currency:
+#                        currencies_in_file.append(currency)
+#
+#        print(currencies_in_file)
 def parse_tsv(filename):
+    dates_and_rates = []
+    currency_lookup = {}
+    currency_date_lookup = {}
+
     with open(filename, 'r') as f:
         imf = csv.reader(f, delimiter='\t')
+
         found_pivot = False
         have_currencies = False
-        for row_number, row in enumerate(imf):
-            for col_number, cell in enumerate(row):
-                if not found_pivot:
-                    if cell[:20] == "Representative rates":
-                        pivot = (row_number, col_number)
-                        print("found it at ", pivot)
-                        found_pivot = True
-                if found_pivot:
+        imf.next()
+        imf.next()
+
+#        print(imf.next())
+#        print(imf.next())
+# TODO: dictionaries!
+        currency_row = imf.next()
+        for col, currency_string in enumerate(currency_row):
+            parsed_currency = parse_currency(currency_string)
+            if parsed_currency:
+                currency_lookup[col] = parsed_currency
+
+        if not currency_lookup:
+            return
+
+        for row, line in enumerate(imf):
+            exchange_rate_date = parse_date(line[1])
+            if not exchange_rate_date:
+                continue
+
+            offset = 2
+            for col, exchange_rate in enumerate(line[offset:]):
+                true_col = col + offset
+                if not true_col in currency_lookup:
+                    continue
+                parsed_exchange_rate = parse_exchange_rate(exchange_rate)
+                if parsed_exchange_rate:
+                    currency_date_lookup[(currency_lookup[true_col], exchange_rate_date)] = parsed_exchange_rate
+
+
+
+#            dates_and_rates.append([exchange_rate_date, exchange_rates])
+            print(len(currency_date_lookup))
+
+#        for i in currencies_in_file:
+#            print(i)
+#
+#        for i in dates_and_rates:
+#            print(i[0], parse_exchange_rate(i[1][0]))
 
 
 

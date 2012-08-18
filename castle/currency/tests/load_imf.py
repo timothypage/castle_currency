@@ -46,5 +46,11 @@ class ParseTest(TestCase):
         Currency.objects.create(name="Indian rupee", abbrev="INR")
         Currency.objects.create(name="Japanese yen", abbrev="JPY")
         Currency.objects.create(name="Korean won", abbrev="KRW")
+        Currency.objects.create(name="New Zealand dollar", abbrev="NZD")
+        Currency.objects.create(name="Sinapore dollar", abbrev="SGD")
+        Currency.objects.create(name="Swedish krona", abbrev="SEK")
+        Currency.objects.create(name="Swiss franc", abbrev="CHF")
+        Currency.objects.create(name="U.K. pound sterling", abbrev="GBP")
+        
         parse_tsv(filename)
 
