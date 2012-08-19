@@ -116,8 +116,9 @@ def parse_currency(currency_string):
 #        print(currencies_in_file)
 def parse_tsv(filename):
     dates_and_rates = []
+    # TODO: make a pivot
     currency_lookup = {}
-    currency_date_lookup = {}
+    exchange_rates = {}
 
     with open(filename, 'r') as f:
         imf = csv.reader(f, delimiter='\t')
@@ -127,9 +128,6 @@ def parse_tsv(filename):
         imf.next()
         imf.next()
 
-#        print(imf.next())
-#        print(imf.next())
-# TODO: dictionaries!
         currency_row = imf.next()
         for col, currency_string in enumerate(currency_row):
             parsed_currency = parse_currency(currency_string)
@@ -151,20 +149,31 @@ def parse_tsv(filename):
                     continue
                 parsed_exchange_rate = parse_exchange_rate(exchange_rate)
                 if parsed_exchange_rate:
-                    currency_date_lookup[(currency_lookup[true_col], exchange_rate_date)] = parsed_exchange_rate
+                    exchange_rates[(currency_lookup[true_col], exchange_rate_date)] = parsed_exchange_rate
 
 
+    return exchange_rates
 
-#            dates_and_rates.append([exchange_rate_date, exchange_rates])
-            print(len(currency_date_lookup))
+def save_imf(exchange_rates):
+    """
+    save exchange rate dictionary as ExchangeRate object in the database
+    TODO: generalize later
+    """
+    for key, rate in exchange_rates.items():
+        currency, date = key
 
-#        for i in currencies_in_file:
-#            print(i)
-#
-#        for i in dates_and_rates:
-#            print(i[0], parse_exchange_rate(i[1][0]))
+        exchange_rate = None
+        try:
+            exchange_rate = ExchangeRate.objects.get(currency=currency, date=date)
+        except ExchangeRate.DoesNotExist:
+            ExchangeRate(currency=currency, date=date, rate=rate).save()
 
-
+        if exchange_rate:
+            if exchange_rate.rate == rate:
+                continue
+            
+            exchange_rate.rate = rate
+            exchange_rate.save()
 
 class Command(BaseCommand):
     """

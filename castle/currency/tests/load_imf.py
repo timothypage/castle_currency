@@ -4,8 +4,8 @@ import datetime
 
 from django.test import TestCase
 
-from currency.management.commands.load_imf import parse_date, parse_exchange_rate, parse_currency, parse_tsv
-from currency.models import Currency
+from currency.management.commands.load_imf import parse_date, parse_exchange_rate, parse_currency, parse_tsv, save_imf
+from currency.models import Currency, ExchangeRate
 
 class ParseTest(TestCase):
     """ test parsing of dates """
@@ -38,19 +38,78 @@ class ParseTest(TestCase):
         self.assertEqual(parse_currency(""), None)
 
     def test_parse_tsv(self):
-        filename = 'currency/tests/testfiles/historical.tsv'
-        Currency.objects.create(name="Australian dollar", abbrev="AUD")
-        Currency.objects.create(name="Canadian dollar", abbrev="CAD")
-        Currency.objects.create(name="Chinese yuan", abbrev="CNY")
-        Currency.objects.create(name="Euro", abbrev="EUR")
-        Currency.objects.create(name="Indian rupee", abbrev="INR")
-        Currency.objects.create(name="Japanese yen", abbrev="JPY")
-        Currency.objects.create(name="Korean won", abbrev="KRW")
-        Currency.objects.create(name="New Zealand dollar", abbrev="NZD")
-        Currency.objects.create(name="Sinapore dollar", abbrev="SGD")
-        Currency.objects.create(name="Swedish krona", abbrev="SEK")
-        Currency.objects.create(name="Swiss franc", abbrev="CHF")
-        Currency.objects.create(name="U.K. pound sterling", abbrev="GBP")
+        filename = 'currency/tests/testfiles/small.tsv'
+#        Currency.objects.create(name="Australian dollar", abbrev="AUD")
+#        Currency.objects.create(name="Canadian dollar", abbrev="CAD")
+#        Currency.objects.create(name="Chinese yuan", abbrev="CNY")
+#        Currency.objects.create(name="Euro", abbrev="EUR")
+#        Currency.objects.create(name="Indian rupee", abbrev="INR")
+#        Currency.objects.create(name="Japanese yen", abbrev="JPY")
+#        Currency.objects.create(name="Korean won", abbrev="KRW")
+#        Currency.objects.create(name="New Zealand dollar", abbrev="NZD")
+#        Currency.objects.create(name="Sinapore dollar", abbrev="SGD")
+#        Currency.objects.create(name="Swedish krona", abbrev="SEK")
+#        Currency.objects.create(name="Swiss franc", abbrev="CHF")
+#        Currency.objects.create(name="U.K. pound sterling", abbrev="GBP")
         
-        parse_tsv(filename)
+        Currency.objects.bulk_create([
+            Currency(name="Japanese yen", abbrev="JPY"),
+            Currency(name="U.K. pound sterling", abbrev="GBP"),
+            Currency(name="U.S. dollar", abbrev="USD")
+        ])
+        currencies = Currency.objects.in_bulk([1,2,3])
+        jpy = currencies[1]
+        gbp = currencies[2]
+        usd = currencies[3]
 
+        feb1 = datetime.date(2011, 2, 1)
+        feb2 = datetime.date(2011, 2, 2)
+        feb3 = datetime.date(2011, 2, 3)
+
+        exchange_rates = parse_tsv(filename)
+        expected = {
+                (jpy, feb1): 82.02,
+                (gbp, feb1): 1.611,
+                (usd, feb1): 1,
+                (jpy, feb2): 81.5,
+                (gbp, feb2): 1.6202,
+                (usd, feb2): 1,
+                (jpy, feb3): 81.64,
+                (gbp, feb3): 1.6215,
+                (usd, feb3): 1
+        }
+
+        self.assertEqual(exchange_rates, expected)
+
+    def test_save_imf(self):
+        Currency.objects.bulk_create([
+                Currency(name="Japanese yen", abbrev="JPY"),
+                Currency(name="U.K. pound sterling", abbrev="GBP"),
+                Currency(name="U.S. dollar", abbrev="USD")
+            ])
+        currencies = Currency.objects.in_bulk([1,2,3])
+        jpy = currencies[1]
+        gbp = currencies[2]
+        usd = currencies[3]
+    
+        feb1 = datetime.date(2011, 2, 1)
+        feb2 = datetime.date(2011, 2, 2)
+        feb3 = datetime.date(2011, 2, 3)
+    
+        expected = {
+                (jpy, feb1): 82.02,
+                (gbp, feb1): 1.611,
+                (usd, feb1): 1,
+                (jpy, feb2): 81.5,
+                (gbp, feb2): 1.6202,
+                (usd, feb2): 1,
+                (jpy, feb3): 81.64,
+                (gbp, feb3): 1.6215,
+                (usd, feb3): 1
+        }
+        save_imf(expected)
+        self.assertEqual(len(ExchangeRate.objects.all()), len(expected))
+        expected[jpy, feb1] = 123.0
+        save_imf(expected)
+        database_jpy_feb1 = ExchangeRate.objects.get(currency=jpy, date=feb1)
+        self.assertEqual(expected[jpy, feb1], database_jpy_feb1.rate)
