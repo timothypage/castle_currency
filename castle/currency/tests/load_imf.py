@@ -113,3 +113,13 @@ class ParseTest(TestCase):
         save_imf(expected)
         database_jpy_feb1 = ExchangeRate.objects.get(currency=jpy, date=feb1)
         self.assertEqual(expected[jpy, feb1], database_jpy_feb1.rate)
+
+    def test_nonsense_file(self):
+        Currency.objects.bulk_create([
+                Currency(name="Japanese yen", abbrev="JPY"),
+                Currency(name="U.K. pound sterling", abbrev="GBP"),
+                Currency(name="U.S. dollar", abbrev="USD")
+            ])
+        filename = 'currency/tests/testfiles/small.tsv'
+        self.assertEqual(None, parse_tsv('currency/tests/testfiles/asdf.txt'))
+        self.assertEqual(None, parse_tsv('currency/tests/testfiles/rr.txt'))

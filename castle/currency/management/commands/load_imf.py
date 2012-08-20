@@ -86,47 +86,23 @@ def parse_currency(currency_string):
     return None
 
 
-#def parse_tsv(filename):
-#    dates_and_rates = []
-#    currencies_in_file = []
-#    with open(filename, 'r') as f:
-#        imf = csv.reader(f, delimiter='\t')
-#        found_pivot = False
-#        have_currencies = False
-#        for row_number, row in enumerate(imf):
-#            for col_number, cell in enumerate(row):
-##                print(cell)
-#                if not found_pivot:
-#                    if cell[:20] == "Representative rates":
-#                        pivot = (row_number, col_number)
-#                        print("found it at ", pivot)
-#                        print(pivot[1])
-#                        found_pivot = True
-#                if found_pivot:
-#                    if col_number < pivot[1]:
-#                        continue
-#
-#                    if cell == "Date":
-#                        continue
-#                    
-#                    currency = parse_currency(cell)
-#                    if currency:
-#                        currencies_in_file.append(currency)
-#
-#        print(currencies_in_file)
 def parse_tsv(filename):
-    dates_and_rates = []
-    # TODO: make a pivot
     currency_lookup = {}
     exchange_rates = {}
+    pivot = None
 
     with open(filename, 'r') as f:
         imf = csv.reader(f, delimiter='\t')
 
-        found_pivot = False
-        have_currencies = False
-        imf.next()
-        imf.next()
+        for row_number, row in enumerate(imf):
+            for col_number, col in enumerate(row):
+                if col[:20] == "Representative rates":
+                    pivot = (row_number, col_number)
+                    break
+            if pivot:
+                break
+        if not pivot:
+            return
 
         currency_row = imf.next()
         for col, currency_string in enumerate(currency_row):
@@ -138,11 +114,11 @@ def parse_tsv(filename):
             return
 
         for row, line in enumerate(imf):
-            exchange_rate_date = parse_date(line[1])
+            exchange_rate_date = parse_date(line[pivot[1]])
             if not exchange_rate_date:
                 continue
 
-            offset = 2
+            offset = pivot[1] + 1 
             for col, exchange_rate in enumerate(line[offset:]):
                 true_col = col + offset
                 if not true_col in currency_lookup:
@@ -158,6 +134,7 @@ def save_imf(exchange_rates):
     """
     save exchange rate dictionary as ExchangeRate object in the database
     TODO: generalize later
+    TODO: save in a transaction? optimize saves?
     """
     for key, rate in exchange_rates.items():
         currency, date = key
