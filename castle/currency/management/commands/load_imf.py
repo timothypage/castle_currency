@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from currency.models import Currency, ExchangeRate, QuarterlyExchangeRate
+from currency.updates import bulk_update
 
 
 def fuzzy_matcher(string1, string2):
@@ -129,6 +130,8 @@ def parse_tsv(filename):
                     continue
                 parsed_exchange_rate = parse_exchange_rate(exchange_rate)
                 if parsed_exchange_rate:
+                    if currency_lookup[true_col].abbrev in ["EUR", "GBP", "AUD", "NZD"]:
+                        parsed_exchange_rate = 1/parsed_exchange_rate
                     exchange_rates[(currency_lookup[true_col], exchange_rate_date)] = parsed_exchange_rate
 
 
@@ -152,9 +155,15 @@ def save_imf(exchange_rates):
         if exchange_rate:
             if exchange_rate.rate == rate:
                 continue
-            
+
             exchange_rate.rate = rate
             exchange_rate.save()
+
+def quarterly_exchange_rates(currencies):
+    """
+    calculates the quarterly exchange rates for a list of currencies.
+    """
+    
 
 class Command(BaseCommand):
     """
@@ -166,11 +175,18 @@ class Command(BaseCommand):
         if not args or len(args) != 1:
             raise CommandError("Please provide a filename to parse")
         
-        filename = args[0]
-        upload_dir = '/home/tim/code/castle_currency/castle/currenct/tests/testfiles'
-        filepath = os.path.join(upload_dir, filename)
+        filepath = args[0]
         
         if not os.path.isfile(filepath):
             raise CommandError("No file found at: {filename}".format(filename=filepath))
         
         print("Here!")
+        exchange_rates = parse_tsv(filepath)
+        if not exchange_rates:
+            raise CommandError("Unable to parse exchange rates from file")
+
+        bulk_update(ExchangeRate, exchange_rates, ("currency", "date"), "rate", prompt=True)
+        
+
+
+

@@ -56,15 +56,17 @@ class ParseTest(TestCase):
         feb3 = datetime.date(2011, 2, 3)
 
         exchange_rates = parse_tsv(filename)
+        # GBP is an inverted currency in imf files, so we'll have to invert it here
+        # see currency.management.command comments for more details
         expected = {
                 (jpy, feb1): 82.02,
-                (gbp, feb1): 1.611,
+                (gbp, feb1): (1/1.611),
                 (usd, feb1): 1,
                 (jpy, feb2): 81.5,
-                (gbp, feb2): 1.6202,
+                (gbp, feb2): (1/1.6202),
                 (usd, feb2): 1,
                 (jpy, feb3): 81.64,
-                (gbp, feb3): 1.6215,
+                (gbp, feb3): (1/1.6215),
                 (usd, feb3): 1
         }
 
