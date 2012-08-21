@@ -4,6 +4,7 @@ from datetime import datetime
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from currency.manager import VortexManager
 
 class Currency(models.Model):
     """
@@ -37,6 +38,8 @@ class ExchangeRate(models.Model):
     date = models.DateField()
     rate = models.FloatField()
     modified = models.DateTimeField(auto_now=True)
+
+    objects = VortexManager()
     
     def clean(self):
         if self.rate <= 0.0:
