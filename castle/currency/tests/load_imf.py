@@ -3,6 +3,7 @@
 import datetime
 
 from django.test import TestCase
+from django.core.management.base import CommandError
 
 from currency.management.commands.load_imf import parse_date, parse_exchange_rate, parse_currency, parse_tsv, save_imf
 from currency.models import Currency, ExchangeRate
@@ -39,19 +40,7 @@ class ParseTest(TestCase):
 
     def test_parse_tsv(self):
         filename = 'currency/tests/testfiles/small.tsv'
-#        Currency.objects.create(name="Australian dollar", abbrev="AUD")
-#        Currency.objects.create(name="Canadian dollar", abbrev="CAD")
-#        Currency.objects.create(name="Chinese yuan", abbrev="CNY")
-#        Currency.objects.create(name="Euro", abbrev="EUR")
-#        Currency.objects.create(name="Indian rupee", abbrev="INR")
-#        Currency.objects.create(name="Japanese yen", abbrev="JPY")
-#        Currency.objects.create(name="Korean won", abbrev="KRW")
-#        Currency.objects.create(name="New Zealand dollar", abbrev="NZD")
-#        Currency.objects.create(name="Sinapore dollar", abbrev="SGD")
-#        Currency.objects.create(name="Swedish krona", abbrev="SEK")
-#        Currency.objects.create(name="Swiss franc", abbrev="CHF")
-#        Currency.objects.create(name="U.K. pound sterling", abbrev="GBP")
-        
+
         Currency.objects.bulk_create([
             Currency(name="Japanese yen", abbrev="JPY"),
             Currency(name="U.K. pound sterling", abbrev="GBP"),
@@ -95,7 +84,7 @@ class ParseTest(TestCase):
         feb1 = datetime.date(2011, 2, 1)
         feb2 = datetime.date(2011, 2, 2)
         feb3 = datetime.date(2011, 2, 3)
-    
+
         expected = {
                 (jpy, feb1): 82.02,
                 (gbp, feb1): 1.611,
@@ -114,12 +103,36 @@ class ParseTest(TestCase):
         database_jpy_feb1 = ExchangeRate.objects.get(currency=jpy, date=feb1)
         self.assertEqual(expected[jpy, feb1], database_jpy_feb1.rate)
 
-    def test_nonsense_file(self):
+    def test_bad_file(self):
         Currency.objects.bulk_create([
                 Currency(name="Japanese yen", abbrev="JPY"),
                 Currency(name="U.K. pound sterling", abbrev="GBP"),
                 Currency(name="U.S. dollar", abbrev="USD")
             ])
-        filename = 'currency/tests/testfiles/small.tsv'
-        self.assertEqual(None, parse_tsv('currency/tests/testfiles/asdf.txt'))
-        self.assertEqual(None, parse_tsv('currency/tests/testfiles/rr.txt'))
+        currencies = Currency.objects.in_bulk([1,2,3])
+        jpy = currencies[1]
+        gbp = currencies[2]
+        usd = currencies[3]
+
+        feb1 = datetime.date(2011, 2, 1)
+        feb2 = datetime.date(2011, 2, 2)
+        feb3 = datetime.date(2011, 2, 3)
+
+        expected = {
+                (jpy, feb1): 82.02,
+                (gbp, feb1): 1.611,
+                (usd, feb1): 1,
+                (jpy, feb2): 81.5,
+                (gbp, feb2): 1.6202,
+                (usd, feb2): 1,
+                (jpy, feb3): 81.64,
+                (gbp, feb3): 1.6215,
+                (usd, feb3): 1
+        }
+        try:
+            parse_tsv('currency/tests/testfiles/mess-with-rr.tsv')
+            self.assertTrue(False)
+        except CommandError:
+            self.assertTrue(True)
+
+        self.assertEqual(expected, parse_tsv('currency/tests/testfiles/mess-with-tabs.tsv'))

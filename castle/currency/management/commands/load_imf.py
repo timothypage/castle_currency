@@ -4,7 +4,7 @@ import csv
 import datetime
 from difflib import SequenceMatcher
 import re
-from os.path import isfile
+import os
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -87,6 +87,7 @@ def parse_currency(currency_string):
 
 
 def parse_tsv(filename):
+#    import pdb; pdb.set_trace()
     currency_lookup = {}
     exchange_rates = {}
     pivot = None
@@ -102,7 +103,7 @@ def parse_tsv(filename):
             if pivot:
                 break
         if not pivot:
-            return
+            raise CommandError("Couldn't find the phrase 'Representative Rates'; Pivot point not set")
 
         currency_row = imf.next()
         for col, currency_string in enumerate(currency_row):
@@ -111,14 +112,17 @@ def parse_tsv(filename):
                 currency_lookup[col] = parsed_currency
 
         if not currency_lookup:
-            return
+            raise CommandError("Didn't parse any currencies from the file")
 
         for row, line in enumerate(imf):
+            if len(line) < 2:
+                continue
+
             exchange_rate_date = parse_date(line[pivot[1]])
             if not exchange_rate_date:
                 continue
 
-            offset = pivot[1] + 1 
+            offset = pivot[1] + 1 # move past date col
             for col, exchange_rate in enumerate(line[offset:]):
                 true_col = col + offset
                 if not true_col in currency_lookup:
@@ -159,10 +163,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         """
         """
-#        if not args or len(args) != 1:
-#            raise CommandError("Please provide a filename to parse")
-#        
-#        filename = args[0]
-#        
-#        if not isfile(filename):
-#            raise CommandError("No file found at: {filename}".format(filename=filename))
+        if not args or len(args) != 1:
+            raise CommandError("Please provide a filename to parse")
+        
+        filename = args[0]
+        upload_dir = '/home/tim/code/castle_currency/castle/currenct/tests/testfiles'
+        filepath = os.path.join(upload_dir, filename)
+        
+        if not os.path.isfile(filepath):
+            raise CommandError("No file found at: {filename}".format(filename=filepath))
+        
+        print("Here!")
