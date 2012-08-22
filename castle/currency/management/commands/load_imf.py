@@ -8,9 +8,11 @@ import os
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Avg
 
 from currency.models import Currency, ExchangeRate, QuarterlyExchangeRate
 from currency.updates import bulk_update
+from castle import quarters
 
 
 def fuzzy_matcher(string1, string2):
@@ -159,11 +161,68 @@ def save_imf(exchange_rates):
             exchange_rate.rate = rate
             exchange_rate.save()
 
-def quarterly_exchange_rates(currencies):
+def which_quarter(date):
+    """
+    Return a tuple (integer 1-4 quarter, integer year) corresponding to which quarter date is in
+    """
+
+    year = date.year
+
+    if date.month <= 3:
+        quarter = (3, 31)
+
+    elif date.month <= 6:
+        quarter = (6, 30)
+
+    elif date.month <= 9:
+        quarter = (9, 30)
+
+    elif date.month <= 12:
+        quarter = (12, 31)
+
+    return (datetime.date(year, quarter[0], quarter[1]))
+
+def begin_quarter(date):
+    """
+    returns the beginning date of a quarter given a date
+    """
+    year = date.year
+    if date.month <= 3:
+        begin_date = (1, 1)
+
+    elif date.month <= 6:
+        begin_date = (4, 1)
+
+    elif date.month <= 9:
+        begin_date = (7, 1)
+
+    elif date.month <= 12:
+        begin_date = (10, 1)
+
+    return (datetime.date(year, begin_date[0], begin_date[1]))
+
+
+def calc_quarterly_exchange_rates(exchange_rates):
     """
     calculates the quarterly exchange rates for a list of currencies.
     """
-    
+    currencies = set()
+    quarters = set()
+    quarterly_exchange_rates = {}
+    for currency, date in exchange_rates.keys():
+        currencies.add(currency)
+        quarters.add(which_quarter(date))
+
+    for currency in currencies:
+        for quarter in quarters:
+            # select all ExchangeRates over the date range for that currency
+            quarter_rate = ExchangeRate.objects.filter(
+                        currency=currency
+                    ).filter(
+                        date__range=(begin_quarter(quarter), quarter)
+                    ).aggregate(Avg('rate'))
+            quarterly_exchange_rates[(currency, quarter)] = quarter_rate['rate__avg']
+    return quarterly_exchange_rates
 
 class Command(BaseCommand):
     """
@@ -174,19 +233,45 @@ class Command(BaseCommand):
         """
         if not args or len(args) != 1:
             raise CommandError("Please provide a filename to parse")
-        
+
         filepath = args[0]
-        
+
         if not os.path.isfile(filepath):
             raise CommandError("No file found at: {filename}".format(filename=filepath))
-        
-        print("Here!")
+
         exchange_rates = parse_tsv(filepath)
         if not exchange_rates:
             raise CommandError("Unable to parse exchange rates from file")
 
+        currencies = set()
+        dates = set()
+        for currency, date in exchange_rates.keys():
+            currencies.add(currency)
+            dates.add(date)
+
+
+        print("The following date range was found in the file:")
+        d_format = "%B %d, %Y"
+        print(min(dates).strftime(d_format), " to ", max(dates).strftime(d_format))
+        print()
+        print("The following currencies were found in the file:")
+        for currency in currencies:
+            print(currency)
+
+
         bulk_update(ExchangeRate, exchange_rates, ("currency", "date"), "rate", prompt=True)
-        
 
+        # update quarterly Exchange Rates
 
+        quarterly_exchange_rates = calc_quarterly_exchange_rates(exchange_rates)
 
+        change_quarters = set()
+        for i, date in quarterly_exchange_rates.keys():
+            change_quarters.add(date)
+
+        print("The following Quarterly Exchange Rates need to be updated:")
+        print("(This will only affect the currencies listed above)")
+        for quarter in change_quarters:
+            print(str(quarters.get_q(quarter)) + "Q", quarter.year)
+
+        bulk_update(QuarterlyExchangeRate, quarterly_exchange_rates, ("currency", "date"), "rate", prompt=True)

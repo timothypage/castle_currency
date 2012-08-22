@@ -71,6 +71,8 @@ class QuarterlyExchangeRate(models.Model):
     date = models.DateField() # TODO should be a quarter field
     rate = models.FloatField()
     modified = models.DateTimeField(auto_now=True)
+
+    objects = VortexManager()
     
     def clean(self):
         # TODO validator?

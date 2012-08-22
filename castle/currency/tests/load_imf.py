@@ -5,8 +5,11 @@ import datetime
 from django.test import TestCase
 from django.core.management.base import CommandError
 
-from currency.management.commands.load_imf import parse_date, parse_exchange_rate, parse_currency, parse_tsv, save_imf
-from currency.models import Currency, ExchangeRate
+from currency.management.commands.load_imf import parse_date, parse_exchange_rate, \
+        parse_currency, parse_tsv, save_imf, calc_quarterly_exchange_rates, \
+        which_quarter
+from currency.models import Currency, ExchangeRate, QuarterlyExchangeRate
+from currency.updates import bulk_update
 
 class ParseTest(TestCase):
     """ test parsing of dates """
@@ -29,7 +32,7 @@ class ParseTest(TestCase):
         self.assertEqual(parse_exchange_rate(''), None)
         self.assertEqual(parse_exchange_rate('\t'), None)
         self.assertEqual(parse_exchange_rate("03-Jan-2011"), None)
-        
+       
     def test_parse_currency(self):
         Currency.objects.create(name="Australian dollar", abbrev="AUD")
         self.assertEqual(Currency.objects.all().count(), 1)
@@ -89,15 +92,17 @@ class ParseTest(TestCase):
 
         expected = {
                 (jpy, feb1): 82.02,
-                (gbp, feb1): 1.611,
+                (gbp, feb1): (1/1.611),
                 (usd, feb1): 1,
                 (jpy, feb2): 81.5,
-                (gbp, feb2): 1.6202,
+                (gbp, feb2): (1/1.6202),
                 (usd, feb2): 1,
                 (jpy, feb3): 81.64,
-                (gbp, feb3): 1.6215,
+                (gbp, feb3): (1/1.6215),
                 (usd, feb3): 1
         }
+
+        
         save_imf(expected)
         self.assertEqual(len(ExchangeRate.objects.all()), len(expected))
         expected[jpy, feb1] = 123.0
@@ -122,15 +127,16 @@ class ParseTest(TestCase):
 
         expected = {
                 (jpy, feb1): 82.02,
-                (gbp, feb1): 1.611,
+                (gbp, feb1): (1/1.611),
                 (usd, feb1): 1,
                 (jpy, feb2): 81.5,
-                (gbp, feb2): 1.6202,
+                (gbp, feb2): (1/1.6202),
                 (usd, feb2): 1,
                 (jpy, feb3): 81.64,
-                (gbp, feb3): 1.6215,
+                (gbp, feb3): (1/1.6215),
                 (usd, feb3): 1
         }
+
         try:
             parse_tsv('currency/tests/testfiles/mess-with-rr.tsv')
             self.assertTrue(False)
@@ -138,3 +144,52 @@ class ParseTest(TestCase):
             self.assertTrue(True)
 
         self.assertEqual(expected, parse_tsv('currency/tests/testfiles/mess-with-tabs.tsv'))
+
+    def test_quarterly_exchange_rates(self):
+
+        Currency.objects.bulk_create([
+            Currency(name="Japanese yen", abbrev="JPY"),
+            Currency(name="U.K. pound sterling", abbrev="GBP"),
+            Currency(name="U.S. dollar", abbrev="USD")
+        ])
+        currencies = Currency.objects.in_bulk([1,2,3])
+        jpy = currencies[1]
+        gbp = currencies[2]
+        usd = currencies[3]
+
+        feb1 = datetime.date(2011, 2, 1)
+        feb2 = datetime.date(2011, 2, 2)
+        feb3 = datetime.date(2011, 2, 3)
+
+        expected = {
+                (jpy, feb1): 82.02,
+                (gbp, feb1): (1/1.611),
+                (usd, feb1): 1,
+                (jpy, feb2): 81.5,
+                (gbp, feb2): (1/1.6202),
+                (usd, feb2): 1,
+                (jpy, feb3): 81.64,
+                (gbp, feb3): (1/1.6215),
+                (usd, feb3): 1
+        }
+
+
+        filename = 'currency/tests/testfiles/small.tsv'
+        exchange_rates = parse_tsv(filename)
+        bulk_update(ExchangeRate, exchange_rates, ("currency", "date"), "rate", prompt=False)
+        quarterly_exchange_rates = calc_quarterly_exchange_rates(exchange_rates)
+        bulk_update(QuarterlyExchangeRate, quarterly_exchange_rates, ("currency", "date"), "rate", prompt=False)
+
+        # test that the correct Quarterly Exchange Rates made it into the database
+        jpy_avg = ( expected[jpy, feb1] +
+                    expected[jpy, feb2] +
+                    expected[jpy, feb3]
+                  ) / 3
+        jpy_avg_db = QuarterlyExchangeRate.objects.get(currency=jpy, 
+                date=datetime.date(2011, 3, 31)).rate
+        self.assertEqual(jpy_avg, jpy_avg_db)
+
+    def test_which_quarter(self):
+        self.assertEqual(datetime.date(2012, 3, 31), which_quarter(datetime.date(2012, 2, 12)))
+        self.assertEqual(datetime.date(2012, 3, 31), which_quarter(datetime.date(2012, 3, 31)))
+        self.assertEqual(datetime.date(2012, 6, 30), which_quarter(datetime.date(2012, 4, 30)))
